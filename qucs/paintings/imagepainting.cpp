@@ -38,44 +38,45 @@ Painting* ImagePainting::newOne()
 
 void ImagePainting::paint(QPainter* painter) {
   loadImage();
+  bool drewSomething = false;
 
-  // Use originalImage if available, otherwise use image
-  QPixmap imageToPaint = originalImage.isNull() ? image : originalImage;
-
-  // Null checks
-  if (!imageToPaint.isNull() && !boundingRect().isEmpty()) {
-    painter->save();
-    painter->setPen(Qt::NoPen);
-
-    // Scale the image to fit the bounding rectangle
-    QPixmap scaledImage = imageToPaint.scaled(
-        boundingRect().size(),
-        Qt::IgnoreAspectRatio,
-        Qt::SmoothTransformation
-        );
-
-    painter->drawPixmap(boundingRect().topLeft(), scaledImage);
-    painter->restore();
-
-    // Draw selection handles when selected
-    if (isSelected) {
-      painter->setPen(QPen(Qt::darkGray, penWidth + 5));
-      painter->drawRect(boundingRect());
-      painter->setPen(QPen(Qt::white, penWidth, penStyle));
-      painter->drawRect(boundingRect());
-
-      // Draw resize handles
-      const auto bounds = boundingRect().marginsAdded({0, 0, 1, 1});
-      misc::draw_resize_handle(painter, bounds.topLeft());
-      misc::draw_resize_handle(painter, bounds.topRight());
-      misc::draw_resize_handle(painter, bounds.bottomRight());
-      misc::draw_resize_handle(painter, bounds.bottomLeft());
+  if (!boundingRect().isEmpty()) {
+    if (m_isSvg && m_svgRenderer && m_svgRenderer->isValid()) {
+      painter->save();
+      painter->setPen(Qt::NoPen);
+      m_svgRenderer->render(painter, boundingRect());
+      painter->restore();
+      drewSomething = true;
+    } else {
+      QPixmap imageToPaint = originalImage.isNull() ? image : originalImage;
+      if (!imageToPaint.isNull()) {
+        painter->save();
+        painter->setPen(Qt::NoPen);
+        QPixmap scaledImage = imageToPaint.scaled(boundingRect().size(),
+                                                  Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        painter->drawPixmap(boundingRect().topLeft(), scaledImage);
+        painter->restore();
+        drewSomething = true;
+      }
     }
-  } else {
-    // Ensure base class is in valid state
-    if (x1 == x2) x2 = x1 + 100; // Default width
-    if (y1 == y2) y2 = y1 + 100; // Default height
+  }
+
+  if (!drewSomething) {
+    if (x1 == x2) x2 = x1 + 100;
+    if (y1 == y2) y2 = y1 + 100;
     Rectangle::paint(painter);
+  }
+
+  if (isSelected) {
+    painter->setPen(QPen(Qt::darkGray, penWidth + 5));
+    painter->drawRect(boundingRect());
+    painter->setPen(QPen(Qt::white, penWidth, penStyle));
+    painter->drawRect(boundingRect());
+    const auto bounds = boundingRect().marginsAdded({0, 0, 1, 1});
+    misc::draw_resize_handle(painter, bounds.topLeft());
+    misc::draw_resize_handle(painter, bounds.topRight());
+    misc::draw_resize_handle(painter, bounds.bottomRight());
+    misc::draw_resize_handle(painter, bounds.bottomLeft());
   }
 }
 
@@ -108,52 +109,31 @@ bool ImagePainting::load(const QString& s) {
   originalImage = QPixmap();
   imagePath.clear();
 
-  // Try to load image from base64 data
-  if (!imageData.isEmpty()) {
-    QByteArray byteArray = QByteArray::fromBase64(imageData.toUtf8());
-    if (!byteArray.isEmpty()) {
-      if (image.loadFromData(byteArray)) {
-        originalImage = image; // Store original for resize operations
-        updateAspectRatio(); // Update aspect ratio when image is loaded
-        return true;
-      } else {
-        qWarning("Failed to load image from base64 data");
-      }
-    }
-  }
+  m_svgRenderer.reset();
+  m_isSvg = false;
 
-  return false;
+  if (imageData.isEmpty()) return false;
+  QByteArray byteArray = QByteArray::fromBase64(imageData.toUtf8());
+  if (byteArray.isEmpty()) return false;
+
+  return loadFromRawData(byteArray);
 }
 
 QString ImagePainting::save() {
-  QString imageData;
+  QByteArray raw;
 
-  // If we have a loaded image, convert it to base64
-  if (!image.isNull()) {
-    QByteArray byteArray;
-    QBuffer buffer(&byteArray);
+  if (m_isSvg && !m_rawData.isEmpty()) {
+    raw = m_rawData;
+  } else if (!image.isNull()) {
+    QBuffer buffer(&raw);
     buffer.open(QIODevice::WriteOnly);
-
-    // Save as PNG format for best quality and transparency support
-    if (image.save(&buffer, "PNG")) {
-      imageData = byteArray.toBase64();
-    }
-  }
-  // If no image loaded but we have a path, try to load and convert
-  else if (!imagePath.isEmpty()) {
-    QPixmap tempImage;
-    if (tempImage.load(imagePath)) {
-      QByteArray byteArray;
-      QBuffer buffer(&byteArray);
-      buffer.open(QIODevice::WriteOnly);
-
-      if (tempImage.save(&buffer, "PNG")) {
-        imageData = byteArray.toBase64();
-      }
-    }
+    image.save(&buffer, "PNG");
+  } else if (!imagePath.isEmpty()) {
+    QFile f(imagePath);
+    if (f.open(QIODevice::ReadOnly)) raw = f.readAll();
   }
 
-  // Return in format: "ImagePainting x1 y1 x2 y2 base64_data"
+  QString imageData = raw.isEmpty() ? QString() : QString::fromLatin1(raw.toBase64());
   return QString("ImagePainting %1 %2 %3 %4 %5")
       .arg(x1).arg(y1).arg(x2).arg(y2).arg(imageData);
 }
@@ -216,7 +196,7 @@ bool ImagePainting::MousePressing(Schematic* sch) {
       parentWidget = QApplication::activeWindow();
     }
 
-    QString filter = QObject::tr("Images (*.bmp *.gif *.jpg *.jpeg *.png)");
+    QString filter = QObject::tr("Images (*.bmp *.gif *.jpg *.jpeg *.png *.svg)");
     QString newPath = QFileDialog::getOpenFileName(
         parentWidget,
         QObject::tr("Select Image"),
@@ -230,19 +210,18 @@ bool ImagePainting::MousePressing(Schematic* sch) {
       originalImage = QPixmap();
       loadImage();
 
-             // Set dimensions to actual image size if image loaded successfully
-      if (!image.isNull()) {
-        x2 = x1 + image.width();
-        y2 = y1 + image.height();
-        updateAspectRatio(); // Update aspect ratio when new image is loaded
+      bool hasContent = !image.isNull() || (m_isSvg && m_svgRenderer && m_svgRenderer->isValid());
+
+      if (hasContent) {
+        x2 = x1 + getImageWidth();
+        y2 = y1 + getImageHeight();
+        updateAspectRatio();
       } else {
-        // Fallback to default square size if image fails to load
         const int squareSize = 100;
         x2 = x1 + squareSize;
         y2 = y1 + squareSize;
       }
     } else {
-      // No image selected.
       return false;
     }
   }
@@ -471,23 +450,16 @@ Element* ImagePainting::info(QString& Name, char* &BitmapFile, bool getNewOne) {
 }
 
 void ImagePainting::loadImage() {
-  // Don't reload if we already have an image and no path (base64 loaded)
-  if (!image.isNull() && imagePath.isEmpty()) {
-    return;
-  }
-
-  // This method is now primarily used for loading from file path
+  if ((m_isSvg && m_svgRenderer) || (!image.isNull() && imagePath.isEmpty()))
+    return; // already have embedded data
   if (imagePath.isEmpty()) return;
 
-  // Only load if not already loaded or if path changed
-  if (image.isNull()) {
-    if (image.load(imagePath)) {
-      originalImage = image; // Store original for resize operations
-      updateAspectRatio(); // Update aspect ratio when image is loaded
-    } else {
-      qWarning("Failed to load image: %s", qUtf8Printable(imagePath));
-    }
+  QFile f(imagePath);
+  if (!f.open(QIODevice::ReadOnly)) {
+    qWarning("Failed to open image file: %s", qUtf8Printable(imagePath));
+    return;
   }
+  loadFromRawData(f.readAll());
 }
 
 // Override rotate methods to maintain functionality
@@ -650,13 +622,53 @@ void ImagePainting::applyAspectRatioToResize(int& newWidth, int& newHeight) {
 
 // Needed to have the image size at schematic.cpp when drag and dropping
 int ImagePainting::getImageWidth() const {
+  if (m_isSvg && m_svgRenderer && m_svgRenderer->isValid()) {
+    int w = m_svgRenderer->defaultSize().width();
+    return w > 0 ? w : 100;
+  }
   if (!originalImage.isNull()) return originalImage.width();
   if (!image.isNull()) return image.width();
-  return 100; // default fallback
+  return 100;
 }
 
 int ImagePainting::getImageHeight() const {
+  if (m_isSvg && m_svgRenderer && m_svgRenderer->isValid()) {
+    int h = m_svgRenderer->defaultSize().height();
+    return h > 0 ? h : 100;
+  }
   if (!originalImage.isNull()) return originalImage.height();
   if (!image.isNull()) return image.height();
-  return 100; // default fallback
+  return 100;
+}
+
+
+bool ImagePainting::detectSvg(const QByteArray& data) const {
+  QByteArray head = data.left(512).trimmed();
+  return head.startsWith("<?xml") || head.startsWith("<svg") || head.contains("<svg");
+}
+
+bool ImagePainting::loadFromRawData(const QByteArray& data) {
+  m_rawData = data;
+  m_svgRenderer.reset();
+  m_isSvg = false;
+
+  if (detectSvg(data)) {
+    auto renderer = std::make_unique<QSvgRenderer>(data);
+    if (renderer->isValid()) {
+      m_svgRenderer = std::move(renderer);
+      m_isSvg = true;
+      updateAspectRatio();
+      return true;
+    }
+    qWarning("Failed to parse SVG data");
+    return false;
+  }
+
+  if (image.loadFromData(data)) {
+    originalImage = image;
+    updateAspectRatio();
+    return true;
+  }
+  qWarning("Failed to load image from data");
+  return false;
 }

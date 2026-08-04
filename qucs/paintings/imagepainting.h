@@ -33,6 +33,7 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QApplication>
+#include <QSvgRenderer>
 
 class ImagePainting : public QObject, public qucs::Rectangle {
   Q_OBJECT
@@ -68,7 +69,31 @@ private:
   QString imagePath;
   QPixmap image;
   QPixmap originalImage;
+
+  /// SVG @{
+  // Raw bytes of the embedded asset exactly as read from disk/base64.
+  // The image can't be stored as a QPixmap because for SVG the XML is needed
+  QByteArray m_rawData;
+
+  // True when m_rawData holds SVG/XML content and should be rendered
+  // vectorially via m_svgRenderer instead of rasterized via QPixmap.
+  bool m_isSvg = false;
+  std::unique_ptr<QSvgRenderer> m_svgRenderer;
+
+  /// @}
+
   void loadImage();
+
+  /// @brief Load image data
+  /// @param data Image data, either XML SVG data or QPixmap
+  /// @return false if something went wrong, true if it loaded ok
+  /// @details Shared decode path used by both load() (base64 from a .sch file) and
+  /// loadImage() (reading an external file referenced by imagePath).
+  /// This avoids duplicating the SVG-vs-raster branch logic.
+  bool loadFromRawData(const QByteArray& data);
+
+  /// @brief Detects if data is XML (SVG) or raw image data
+  bool detectSvg(const QByteArray& data) const;
 
   enum DraggedCorner { TopLeft, TopRight, BottomLeft, BottomRight, NotSet };
   DraggedCorner m_draggedCorner = NotSet;
