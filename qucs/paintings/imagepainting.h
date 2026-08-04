@@ -1,18 +1,8 @@
-/***************************************************************************
-                              imagepainting.h
-                             ---------------
-    copyright            : (C) 2025 by Andrés Martínez Mera
-    email                : andresmartinezmera@gmail.com
- ***************************************************************************/
+/// @file imagepainting.h
+/// @brief Image painting component class (definition)
+/// @author Andrés Martínez Mera
+/// @date August 04, 2026
 
-/***************************************************************************
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- ***************************************************************************/
 #ifndef IMAGEPAINTING_H
 #define IMAGEPAINTING_H
 
