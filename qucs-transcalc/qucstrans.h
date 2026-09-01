@@ -28,6 +28,9 @@
 #include <QCloseEvent>
 #include <QMainWindow>
 #include <QDir>
+#include <QVector>
+
+#include "substratelib.h"
 class QComboBox;
 class QLineEdit;
 class QLabel;
@@ -167,6 +170,7 @@ private slots:
   void slotOptions();
   void slotRadioChecked(int);
   void slotCopyToClipBoard();
+  void slotSubstrateSelected(int);
 
 private:
   void updateSelection ();
@@ -185,6 +189,8 @@ private:
   void updateMode (void);
   void storeValues (void);
   void updatePixmap (int);
+  void loadSubstrates (void);
+  void applySubstrate (const SubstrateDef &);
 
  private:
   void closeEvent (QCloseEvent*);
@@ -195,6 +201,11 @@ private:
   QComboBox * tranType;
   QGroupBox * calculated;
   int mode;
+
+  // Substrates
+  QComboBox * substrateBox; // Combo with the substrates read from /share folder
+  QVector<SubstrateDef> substrates; // Substrate data parsed from /share folder
+  bool applyingSubstrate;
 };
 
 #endif /* QUCSTRANS_H */

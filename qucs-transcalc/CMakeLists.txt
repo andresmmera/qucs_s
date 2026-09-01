@@ -89,6 +89,7 @@ SET(QUCSTRANS_HDRS
   transline.h
   stripline.h
   units.h
+  substratelib.h
 )
 
 SET(QUCSTRANS_MOC_HDRS
@@ -106,6 +107,7 @@ SET( LIB_SRC
   rectwaveguide.cpp
   transline.cpp
   stripline.cpp
+  substratelib.cpp
 )
 
 SET(RESOURCES qucstrans_.qrc)
