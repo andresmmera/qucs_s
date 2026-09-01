@@ -54,6 +54,7 @@
 #include <QDebug>
 
 #include "qucstrans.h"
+#include "substratelib.h"
 #include "helpdialog.h"
 #include "optionsdialog.h"
 #include "transline.h"
@@ -278,6 +279,7 @@ struct TransUnit TransUnits[] = {
 
 /* Constructor setups the GUI. */
 QucsTranscalc::QucsTranscalc() {
+  applyingSubstrate = false;
   QWidget *centralWidget = new QWidget(this);  
   setCentralWidget(centralWidget);
   
@@ -384,11 +386,26 @@ QucsTranscalc::QucsTranscalc() {
   QVBoxLayout *vm = new QVBoxLayout();
   vm->setSpacing (3);
 
+  // Substrate library selector
+  QHBoxLayout * hsub = new QHBoxLayout();
+  QLabel * substLabel = new QLabel (tr("Substrate:"));
+  substrateBox = new QComboBox ();
+  substrateBox->addItem (tr("Custom"));
+  substrateBox->setToolTip (tr("Pick a predefined substrate from Substrates.lib"));
+  hsub->addWidget(substLabel);
+  hsub->addWidget(substrateBox, 1);
+  vm->addLayout(hsub);
+  connect(substrateBox, SIGNAL(activated(int)), SLOT(slotSubstrateSelected(int)));
+
   // substrate parameter box
   QGroupBox * substrate = new QGroupBox (tr("Substrate Parameters"));
   vm->addWidget(substrate);
   // Pass the GroupBox > create Grid layout > Add widgets > set layout
   createPropItems (substrate, TRANS_SUBSTRATE);
+
+  // Load substrates from library
+  loadSubstrates();
+
   // component parameter box
   QGroupBox * component = new QGroupBox (tr("Component Parameters"));
   vm->addWidget(component);
@@ -1044,6 +1061,10 @@ void QucsTranscalc::slotSynthesize()
 
 void QucsTranscalc::slotValueChanged()
 {
+  if (!applyingSubstrate){
+    // If the user modifies a value manually, it invalidates the input from the substrate combo
+    substrateBox->setCurrentIndex (0);
+  }
   statusBar()->showMessage(tr("Values are inconsistent."));
 }
 
@@ -1508,4 +1529,66 @@ void QucsTranscalc::slotCopyToClipBoard()
     statusBar()->showMessage(tr("Schematic copied into clipboard."), 2000);
   else
     statusBar()->showMessage(tr("Transmission line type not available."), 2000);
+}
+
+
+// Locates and parses Substrates.lib, filling the substrate selector
+// combo box with every substrate it contains. Called once at startup;
+// if the library cannot be found or contains no substrates the combo
+// box is simply left with its single "Custom" entry.
+void QucsTranscalc::loadSubstrates (void){
+  QString path = findSubstrateLibraryFile ();
+
+  if (path.isEmpty ()) {
+        statusBar()->showMessage(tr("Substrate library (Substrates.lib) not found."));
+        return;
+  }
+
+  QString err;
+  substrates = loadSubstrateLibrary (path, &err);
+    if (substrates.isEmpty ()) {
+        statusBar()->showMessage(err);
+        return;
+      }
+
+    for (const SubstrateDef &s : substrates)
+      substrateBox->addItem (s.name);
+}
+
+/* Copies the values of the given library substrate into the currently
+   visible "Substrate Parameters" fields, using the same setProperty()
+   / setUnit() machinery used when loading a saved transcalc file. */
+void QucsTranscalc::applySubstrate (const SubstrateDef &s) {
+  applyingSubstrate = true;
+
+  setProperty ("Er", s.er);
+  setProperty ("H",  s.h);
+  setUnit     ("H",  s.hUnit.toLatin1());
+  setProperty ("T",  s.t);
+  setUnit     ("T",  s.tUnit.toLatin1());
+  setProperty ("Tand", s.tand);
+  if (s.rho > 0.0)
+        setProperty ("Cond", 1.0 / s.rho); // library stores resistivity (Ohm*m)
+  setProperty ("Rough", s.rough);
+  setUnit     ("Rough", "m");
+
+  substrateBox->setToolTip (s.description.isEmpty () ?
+                                               tr("Pick a predefined substrate from Substrates.lib") :
+                                               s.description);
+
+  storeValues ();
+  slotAnalyze ();
+
+  applyingSubstrate = false;
+
+  statusBar()->showMessage(tr("Loaded substrate \"%1\".").arg(s.name));
+}
+
+/* Called whenever the user picks an entry in the substrate combo box.
+   Index 0 is always "Custom" and leaves the current values untouched. */
+void QucsTranscalc::slotSubstrateSelected (int index) {
+  if (index <= 0 || index > substrates.size ())
+    return;
+
+  applySubstrate (substrates.at (index - 1));
 }
