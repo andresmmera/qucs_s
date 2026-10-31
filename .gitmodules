@@ -7,3 +7,6 @@
 [submodule "qucs-s-spar-viewer"]
 	path = qucs-s-spar-viewer
 	url = https://github.com/andresmmera/qucs-s-spar-viewer.git
+[submodule "RFdudeSmithChartV2"]
+	path = RFdudeSmithChartV2
+	url = https://github.com/llascari/RFdudeSmithChartV2
