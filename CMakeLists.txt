@@ -82,6 +82,12 @@ else()
 	message("RxCalc submodule not found. Please update submodules")
 endif()
 
+if(EXISTS ${CMAKE_SOURCE_DIR}/RFdudeSmithChartV2/CMakeLists.txt)
+    add_subdirectory(RFdudeSmithChartV2)
+else()
+	message("Smith Chart submodule not found. Please update submodules")
+endif()
+
 
 IF (UPDATE_TRANSLATIONS)
   file(GLOB_RECURSE FILES_TO_TRANSLATE "*.cpp" "*.h" "*.ui")
