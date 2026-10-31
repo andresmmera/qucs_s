@@ -969,6 +969,11 @@ void QucsApp::slotCallRxCalc() {
   launchTool("rxcalc", "multistage receiver calculation", QStringList());
 }
 
+void QucsApp::slotCallSmithChartTool() {
+  launchTool("RFdudeSmithChartV2", "Smith Chart Tool", QStringList());
+}
+
+
 /*!
  * \brief launch an external application passing arguments
  *

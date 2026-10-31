@@ -704,6 +704,12 @@ void QucsApp::initActions() {
       tr("Power combining\n\nStarts power combining calculation program"));
   connect(callRFLayout, SIGNAL(triggered()), SLOT(slotCallRFLayout()));
 
+  callSmithChartTool = new QAction(tr("Smith Chart tool"), this);
+  callSmithChartTool->setStatusTip(tr("Starts interactive Smith Chart"));
+  callSmithChartTool->setWhatsThis(
+      tr("Smith Chart Tool\n\nStarts Starts interactive Smith Chart"));
+  connect(callSmithChartTool, SIGNAL(triggered()), SLOT(slotCallSmithChartTool()));
+
   simulate =
       new QAction(QIcon((":/bitmaps/svg/gear.svg")), tr("Simulate"), this);
   simulate->setShortcut(Qt::Key_F2);
@@ -1002,6 +1008,7 @@ void QucsApp::initMenuBar() {
   toolMenu->addAction(callRFLayout);
   toolMenu->addAction(callSPAR_Viewer);
   toolMenu->addAction(callRxcalc);
+  toolMenu->addAction(callSmithChartTool);
   toolMenu->addSeparator();
 
   cmMenu = new QMenu(tr("Compact modelling"));
@@ -1583,6 +1590,9 @@ void QucsApp::setDefaultShortcut() {
 
   mgr.registerCommand("Tools.RXCalc", "Tools", "RXCalc", callRxcalc,
                       QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_2));
+
+  mgr.registerCommand("Tools.SmithChart", "Tools", "SmithChartTool", callSmithChartTool,
+                      QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_3));
 
   //
   // SIMULATION

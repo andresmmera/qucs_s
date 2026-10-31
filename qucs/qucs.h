@@ -464,7 +464,7 @@ public:
       *changeProps, *addToProj, *editFind, *insEntity, *selectMarker,
       *createLib, *callConverter, *graph2csv, *callAtt, *centerHor, *centerVert,
       *loadModule, *buildModule, *callPwrComb, *callRFLayout, *callSPAR_Viewer,
-      *callRxcalc;
+      *callRxcalc, *callSmithChartTool;
 
   QAction *helpQucsIndex;
   QAction *simSettings;
@@ -522,6 +522,7 @@ public slots:
   void slotCallPwrComb();
   void slotCallSPAR_Viewer();
   void slotCallRxCalc();
+  void slotCallSmithChartTool();
   void slotCallRFLayout();
   void slotHelpIndex(); // shows a HTML docu: Help Index
   void slotHelpQucsIndex();
